@@ -1,113 +1,33 @@
-<!doctype html>
-<html lang="de">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Raymel Music – Shop (Sandbox)</title>
-  <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:2rem;max-width:720px}
-    .card{border:1px solid #e5e7eb;border-radius:12px;padding:1rem;margin-top:1rem}
-    input{padding:.5rem;border:1px solid #d1d5db;border-radius:8px;width:100%;max-width:360px}
-    #paypal{margin-top:1rem}
-    #direct{margin-top:.5rem;padding:.6rem 1rem;border:1px solid #d1d5db;border-radius:10px;background:#fff;cursor:pointer}
-  </style>
-</head>
-<body>
-  <h1>Raymel Music – Test-Track</h1>
-  <p>Sandbox-Modus: kein echtes Geld. Nach Zahlung erhältst du eine Mail mit Downloadlink.</p>
-
-  <div class="card">
-    <p><strong>Test-Track</strong> – €2,00</p>
-    <label for="email">E-Mail für die Downloadlinks:</label><br/>
-    <input id="email" type="email" placeholder="deine@email.de" />
-    <div id="paypal"></div>
-    <button id="direct" type="button">Direkt bei PayPal öffnen (Fallback)</button>
-  </div>
-
-  <script>
-    function qs(k){return new URLSearchParams(location.search).get(k)}
-    function storeEmail(){ const v = document.getElementById('email').value.trim(); if(v) localStorage.setItem('buyer_email', v); }
-
-    (async () => {
-      // 1) Wenn wir aus PayPal zurückkamen (Redirect-Flow), sofort capturen:
-      const ret = qs('ppreturn'), tok = qs('token');
-      if (ret && tok) {
-        const email = localStorage.getItem('buyer_email') || document.getElementById('email').value.trim() || undefined;
-        try {
-          const r = await fetch('/.netlify/functions/capture-order', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ orderId: tok, notifyEmail: email })
-          });
-          const t = await r.text();
-          try {
-            const j = JSON.parse(t);
-            alert(j.status === 'COMPLETED'
-              ? 'Danke! Wenn du eine E-Mail eingetragen hast, sind die Downloadlinks unterwegs.'
-              : 'Zahlungsstatus: ' + j.status);
-          } catch { alert('Antwort: ' + t); }
-        } catch(e) { alert('Fehler beim Capturen: ' + e.message); }
-      }
-
-      // 2) PayPal SDK laden (mit intent/locale) + Smart Buttons
-      const cfg = await (await fetch('/.netlify/functions/public-config')).json();
-      if (!cfg.paypalClientId) {
-        document.getElementById('paypal').innerText = 'Keine PayPal Client ID.';
-        return;
-      }
-      const s = document.createElement('script');
-      s.src = 'https://www.paypal.com/sdk/js?client-id='
-        + encodeURIComponent(cfg.paypalClientId)
-        + '&currency=EUR&intent=capture&commit=true&locale=de_DE&buyer-country=DE';
-      s.onload = () => {
-        const cart = [{ id: 'beat_001' }];
-
-        paypal.Buttons({
-          createOrder: async () => {
-            // Order anlegen (für Smart Buttons)
-            const r = await fetch('/.netlify/functions/create-order', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ cart })
-            });
-            const { orderId } = await r.json();
-            return orderId;
-          },
-          onClick: () => storeEmail(),
-          onApprove: async (data) => {
-            const email = localStorage.getItem('buyer_email') || document.getElementById('email').value.trim();
-            const r = await fetch('/.netlify/functions/capture-order', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ orderId: data.orderID, notifyEmail: email || undefined })
-            });
-            const t = await r.text();
-            try {
-              const j = JSON.parse(t);
-              alert(j.status === 'COMPLETED'
-                ? 'Danke! Wenn du eine E-Mail eingetragen hast, sind die Downloadlinks unterwegs.'
-                : 'Zahlungsstatus: ' + j.status);
-            } catch(e) { alert('Antwort: ' + t); }
-          }
-        }).render('#paypal');
-      };
-      document.head.appendChild(s);
-
-      // 3) Fallback-Button: Direkter Redirect zu PayPal
-      document.getElementById('direct').addEventListener('click', async () => {
-        try {
-          storeEmail();
-          const r = await fetch('/.netlify/functions/create-order', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cart: [{ id: 'beat_001' }] })
-          });
-          const { orderId } = await r.json();
-          // Direkt-Link zum Checkout (Sandbox)
-          window.location.href = 'https://www.sandbox.paypal.com/checkoutnow?token=' + encodeURIComponent(orderId);
-        } catch(e) {
-          alert('Fehler beim Erstellen der Bestellung: ' + e.message);
-        }
-      });
-    })();
-  </script>
-</body>
-</html>
+paypal.Buttons({
+  createOrder: async () => {
+    const r = await fetch('/.netlify/functions/create-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cart: [{ id: 'beat_001' }] })
+    });
+    const text = await r.text();
+    let data;
+    try { data = JSON.parse(text); } catch (e) { throw new Error(text); }
+    if (!r.ok) throw new Error(data?.error || text);
+    if (!data?.orderId) throw new Error('orderId missing');
+    return data.orderId;
+  },
+  onApprove: async (data) => {
+    const email = localStorage.getItem('buyer_email') || document.getElementById('email').value.trim();
+    const r = await fetch('/.netlify/functions/capture-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderId: data.orderID, notifyEmail: email || undefined })
+    });
+    const t = await r.text();
+    try {
+      const j = JSON.parse(t);
+      alert(j.status === 'COMPLETED'
+        ? 'Danke! Wenn du eine E-Mail eingetragen hast, sind die Downloadlinks unterwegs.'
+        : 'Zahlungsstatus: ' + j.status);
+    } catch(e) { alert('Antwort: ' + t); }
+  },
+  onError: (err) => {
+    alert('Fehler beim Starten der Zahlung: ' + (err?.message || err));
+  }
+}).render('#paypal');
