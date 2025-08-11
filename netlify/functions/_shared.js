@@ -35,7 +35,6 @@ async function ppToken() {
 
 async function ppCreateOrder(totalEUR, cartIdsCsv) {
   const { access_token } = await ppToken();
-
   const BASE = process.env.URL || process.env.DEPLOY_PRIME_URL || '';
   const res = await fetch(`${PP_BASE}/v2/checkout/orders`, {
     method: 'POST',
@@ -59,7 +58,7 @@ async function ppCreateOrder(totalEUR, cartIdsCsv) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(JSON.stringify(data));
-  return data; // enthält .id
+  return data; // .id etc.
 }
 
 async function ppCapture(orderId) {
@@ -135,4 +134,3 @@ module.exports = {
   fs,
   path,
 };
-
