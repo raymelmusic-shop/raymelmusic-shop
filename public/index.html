@@ -1,8 +1,57 @@
 <!doctype html>
-<html lang="de"><head>
-  <meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Raymel Music – Test</title>
-</head><body>
-  <h1>Raymel Music – Test</h1>
-  <p><a href="/.netlify/functions/public-config" target="_blank">Config prüfen</a></p>
-</body></html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Raymel Music – Testkauf (Sandbox)</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:2rem;max-width:720px}
+    .card{border:1px solid #e5e7eb;border-radius:12px;padding:1rem;margin-top:1rem}
+  </style>
+</head>
+<body>
+  <h1>Raymel Music – Testkauf</h1>
+  <p>Das ist ein <strong>Sandbox</strong>-Test. Du zahlst kein echtes Geld.</p>
+
+  <div class="card">
+    <h2>Test-Track</h2>
+    <p>Preis: <strong>2,00 €</strong></p>
+    <div id="paypal-buttons"></div>
+  </div>
+
+  <script>
+    (async () => {
+      try {
+        const r = await fetch('/.netlify/functions/public-config');
+        const { paypalClientId } = await r.json();
+        if (!paypalClientId) {
+          document.getElementById('paypal-buttons').innerText = 'Keine PayPal Client ID gefunden.';
+          return;
+        }
+        const s = document.createElement('script');
+        s.src = 'https://www.paypal.com/sdk/js?client-id=' + encodeURIComponent(paypalClientId) + '&currency=EUR';
+        s.onload = () => {
+          paypal.Buttons({
+            // Für den Sandbox-Test erstellen & capturen wir die Zahlung rein im Client
+            createOrder: (data, actions) => actions.order.create({
+              purchase_units: [{ amount: { value: '2.00', currency_code: 'EUR' }, description: 'Raymel Test-Track' }]
+            }),
+            onApprove: async (data, actions) => {
+              try {
+                await actions.order.capture();
+                alert('Danke! Sandbox-Zahlung erfolgreich.');
+              } catch (e) {
+                alert('Fehler beim Capturen: ' + e);
+              }
+            }
+          }).render('#paypal-buttons');
+        };
+        document.head.appendChild(s);
+      } catch (e) {
+        console.error(e);
+        document.getElementById('paypal-buttons').innerText = 'Fehler beim Laden der PayPal SDK.';
+      }
+    })();
+  </script>
+</body>
+</html>
