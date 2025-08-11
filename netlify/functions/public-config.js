@@ -1,12 +1,7 @@
-[build]
-  publish = "public"
-  command = ""
-
-[functions]
-  directory = "netlify/functions"
-  node_bundler = "esbuild"
-
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
+exports.handler = async () => {
+  return {
+    statusCode: 200,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paypalClientId: process.env.PP_CLIENT_ID || '' })
+  };
+};
